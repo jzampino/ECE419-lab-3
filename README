@@ -1,0 +1,23 @@
+Giuseppe Zampino (j.zampino@mail.utoronto.ca)
+997652589
+
+To run the server:
+
+./server.sh <listen_port> <number_of_players>
+
+To run the game on a local machine:
+
+./run.sh <server_port> <server_host_name> <local_listening_port>
+
+The server will block until at least <number_of_players> players joins the game. This can be as many as you want,
+but theoretically the more that play the more delay there will be in broadcasting to all players. That being said
+I didn't handle the case where you have more players join than <number_of_players>, so behavior in that case
+is undefined, and I wouldn't recommend breaking the code that way.
+
+If one player quits, the game will end, but the server will stay alive, and wait for further connections.
+
+If the server is killed (via CTRL-C) then it will signal all connected players that it is about to die and all
+players will perceive that someone has left, and end the game.
+
+See comments in teh code for specific details on implementation. The makefile may complain as well, just
+ignore it.
