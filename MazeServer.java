@@ -3,7 +3,7 @@ import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
 
-public class MazeServer {
+public class MazeLeader {
 
 	// This will keep track of all players in the game
 	public static ConcurrentSkipListMap<Integer, PlayerInfo> playerList = new ConcurrentSkipListMap<Integer, PlayerInfo>();
@@ -14,27 +14,23 @@ public class MazeServer {
 	// Number of players required for a game. If the playerList is smaller, we have to wait until it is at least
 	// numPlayers long
 	public static int numPlayers = 0;
+	private static ServerSocket serverSocket = null;
 
-	public static void main(String[] args) throws IOException {
+	public static MazeLeader(int socket) {
 
-		ServerSocket serverSocket = null;
 		boolean listening = true;
 
 		try {
-			if (args.length == 2) {
-				serverSocket = new ServerSocket(Integer.parseInt(args[0]));
-				numPlayers = Integer.parseInt(args[1]);
-				new MazeServerProcessor().start();
-			} else {
-				System.err.println("ERROR: Invalid number of arguments passed in!");
-				System.out.println("Usage: java MazeServer <port_num> <number_of_players>");
-				System.exit(-1);
-			}
+			serverSocket = new ServerSocket(socket);
+			new MazeLeaderProcessor().start();
 		}
 		catch (IOException e) {
 			System.err.println("ERROR: Could not listen on port!");
 			System.exit(-1);
 		}
+	}
+
+	public void run() {
 
 		Runtime runtime = Runtime.getRuntime();
 		Thread serverShutdown = new Thread(new MazeServerShutdown(serverSocket));
@@ -43,7 +39,7 @@ public class MazeServer {
 		while (listening) {
 			// The above is straightforward, just spawn a thread to add items to the FIFO
 			try {
-				new MazeServerRequestHandler(serverSocket.accept()).start();
+				new MazeLeaderRequestHandler(serverSocket.accept()).start();
 			} catch (SocketException e) {
 			}
 		}
@@ -56,11 +52,11 @@ public class MazeServer {
 	}
 }
 
-class MazeServerShutdown implements Runnable {
+class MazeLeaderShutdown implements Runnable {
 
 	private ServerSocket serverSocket;
 
-	public MazeServerShutdown (ServerSocket serverSocket) {
+	public MazeLeaderShutdown (ServerSocket serverSocket) {
 		this.serverSocket = serverSocket;
 	}
 
@@ -75,7 +71,7 @@ class MazeServerShutdown implements Runnable {
 		pAction.uID = -1;
 
 		try {
-			for (Map.Entry<Integer, PlayerInfo> player : MazeServer.playerList.entrySet()) {
+			for (Map.Entry<Integer, PlayerInfo> player : MazeLeader.playerList.entrySet()) {
 				pInfo = player.getValue();
 
 				Socket socket = new Socket(pInfo.hostName, pInfo.listenPort);

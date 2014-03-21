@@ -125,14 +125,14 @@ public abstract class Client {
         }
 
         /**
-         * Ask the server if we can move forward
+         * Ask the leader if we can move forward
          * @return <code>true</code> if move was successful, otherwise <code>false</code>.
          */
         protected boolean forward() {
                 assert(maze != null);
                 
 				try {
-					Socket socket = new Socket(Mazewar.serverName, Mazewar.serverPort);
+					Socket socket = new Socket(Mazewar.leaderName, Mazewar.leaderPort);
 					PlayerPacket pForward = new PlayerPacket();
 
 					pForward.type = PlayerPacket.PLAYER_FORWARD;
@@ -146,20 +146,20 @@ public abstract class Client {
 
 					return true;
 				} catch (IOException e) {
-					System.err.println("ERROR: Cannot connect to server!");
+					System.err.println("ERROR: Cannot connect to leader!");
 					return false;
 				}
         }
         
         /**
-         * Ask the server if we can move backward
+         * Ask the leader if we can move backward
          * @return <code>true</code> if move was successful, otherwise <code>false</code>.
          */
         protected boolean backup() {
                 assert(maze != null);
 
 				try {
-					Socket socket = new Socket(Mazewar.serverName, Mazewar.serverPort);
+					Socket socket = new Socket(Mazewar.leaderName, Mazewar.leaderPort);
 					PlayerPacket pBackup = new PlayerPacket();
 
 					pBackup.type = PlayerPacket.PLAYER_BACKUP;
@@ -173,17 +173,17 @@ public abstract class Client {
 
 					return true;
 				} catch (IOException e) {
-					System.err.println("ERROR: Cannot connect to server!");
+					System.err.println("ERROR: Cannot connect to leader!");
 					return false;
 				}
         }
         
         /**
-         * Ask the server if we can turn 90-degrees clockwise
+         * Ask the leader if we can turn 90-degrees clockwise
          */
         protected void turnLeft() {
 				try {
-					Socket socket = new Socket(Mazewar.serverName, Mazewar.serverPort);
+					Socket socket = new Socket(Mazewar.leaderName, Mazewar.leaderPort);
 					PlayerPacket pLeft = new PlayerPacket();
 
 					pLeft.type = PlayerPacket.PLAYER_LEFT;
@@ -195,16 +195,16 @@ public abstract class Client {
 					toServer.close();
 					socket.close();
 				} catch (IOException e) {
-					System.err.println("ERROR: Cannot connect to server!");
+					System.err.println("ERROR: Cannot connect to leader!");
 				}
         }
         
         /**
-         * Ask the server if we can turn 90-degrees counter-clockwise
+         * Ask the leader if we can turn 90-degrees counter-clockwise
          */
         protected void turnRight() {
                 try {
-					Socket socket = new Socket(Mazewar.serverName, Mazewar.serverPort);
+					Socket socket = new Socket(Mazewar.leaderName, Mazewar.leaderPort);
 					PlayerPacket pRight = new PlayerPacket();
 
 					pRight.type = PlayerPacket.PLAYER_RIGHT;
@@ -216,19 +216,19 @@ public abstract class Client {
 					toServer.close();
 					socket.close();
 				} catch (IOException e) {
-					System.err.println("ERROR: Cannot connect to server!");
+					System.err.println("ERROR: Cannot connect to leader!");
 				}
         }
         
         /**
-         * Ask the server if we can shoot a projectile
+         * Ask the leader if we can shoot a projectile
          * @return <code>true</code> if a projectile was successfully launched, otherwise <code>false</code>.
          */
         protected boolean fire() {
                 assert(maze != null);
 
                 try {
-					Socket socket = new Socket(Mazewar.serverName, Mazewar.serverPort);
+					Socket socket = new Socket(Mazewar.leaderName, Mazewar.leaderPort);
 					PlayerPacket pFire = new PlayerPacket();
 
 					pFire.type = PlayerPacket.PLAYER_FIRE;
@@ -242,7 +242,7 @@ public abstract class Client {
 
 					return true;
 				} catch (IOException e) {
-					System.err.println("ERROR: Cannot connect to server!");
+					System.err.println("ERROR: Cannot connect to leader!");
 					
 					return false;
 				}

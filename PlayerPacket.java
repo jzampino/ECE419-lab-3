@@ -23,7 +23,7 @@ public class PlayerPacket implements Serializable {
 	public String playerName;
 	
 	// Unique ID of this player
-	public int uID;
+	public String uID;
 	
 	// Packet type
 	public int type;
