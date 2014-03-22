@@ -47,6 +47,7 @@ public class Mazewar extends JFrame {
 		public static String uID;
 		public static int leaderPort;
 		public static String leaderName;
+		public static ConcurrentSkipListMap<String, Client> existingPlayers = new ConcurrentSkipListMap<String, Client>();
 
         /**
          * The default width of the {@link Maze}.
@@ -151,17 +152,20 @@ public class Mazewar extends JFrame {
         /** 
          * The place where all the pieces are put together. 
          */
-        public Mazewar(int leaderPort, String leaderName, int listenPort) {
+        public Mazewar(String leaderName, int listenPort, int numPlayers) {
                 super("ECE419 Mazewar");
                 consolePrintLn("ECE419 Mazewar started!");
                 
 				// Set up globals for server communication
 				this.leaderName = leaderName;
-				this.leaderPort = leaderPort;
+				this.leaderPort = 3040;
+
 				try {
 					this.uID = java.net.InetAddress.getLocalHost().getHostName() + "." + listenPort;
 				} catch (UnknownHostException e) {
-					System.err.println("
+					System.err.println("Unable to verify hostname!");
+					System.exit(1);
+				}
 
                 // Create the maze
                 maze = new MazeImpl(new Point(mazeWidth, mazeHeight), mazeSeed);
@@ -184,69 +188,105 @@ public class Mazewar extends JFrame {
 
 				String tempID = null; // This isn't necessary anymore, but I don't want to change it
 				
-				try {
 				
-					ServerSocket listenSocket = new ServerSocket(listenPort);
+				try {
 					
 					// Check if the name of the name of the leader machine passed in is our own
+					// if so, we are the first player in the game.
 					if((leaderName.equals(java.net.InetAddress.getLocalHost().getHostName()))) {
-						Socket sendSocket = new Socket(java.net.InetAddress.getLocalHost().getHostName(), leaderPort);
-						// ConcurrentSkipListMap<int, playerPacket> actionLog = new ConcurrentSkipListMap<String, Client>();
+                		guiClient = new GUIClient(name);
+                		maze.addClient(guiClient);
+                		this.addKeyListener(guiClient);
+
+						PlayerPacket pAction = new PlayerPacket();
+						pAction.hostName = leaderName;
+						pAction.playerName = name;
+						pAction.uID = uID;
+						pAction.type = PlayerPacket.PLAYER_REGISTER_UPDATE;
+						pAction.prevLogIndex = 1;
+
+						new MazeLeader(leaderPort, numPlayers).start();
+					 	existingPlayers.put(uID, guiClient);
+						MazeLeader.actionLog.put(pAction.prevLogIndex, pAction);
+
+						while(MazeLeader.actionLog.size() < numPlayers) {
+							//handlePlayerConnect(listenSocket, actionLog, existingPlayers, maze);
+							for (Map.Entry<Integer, PlayerPacket> logEvent : MazeLeader.actionLog.entrySet()) {
+								if(!existingPlayers.containsKey(logEvent.getValue().uID)) {
+									Client newClient = new RemoteClient(logEvent.getValue().playerName);
+									existingPlayers.put(logEvent.getValue().uID, newClient);
+									maze.addClient(newClient);
+								}
+							}
+						}
+
+						new ClientUpdateHandler(maze, listenPort).start();
+						//Socket sendSocket = new Socket(java.net.InetAddress.getLocalHost().getHostName(), listenPort);
 					} else {
 
-						Socket sendSocket = new Socket(leaderName, leaderPort);
+						ConcurrentSkipListMap<Integer, PlayerPacket> actionList = new ConcurrentSkipListMap<Integer, PlayerPacket>();
+
+						ServerSocket listenSocket = new ServerSocket(listenPort);
+						Socket sendSocket = new Socket(leaderName, 3040);
 
 						PlayerPacket cRequest = new PlayerPacket();
 						PlayerPacket cResponse;
 
-						// Set up the initial registration packet for the server,
+						// Set up the initial registration packet for the fake leader,
 						// we will block on this until we recevie a confirmation
 						// reply from the server
 						cRequest.type = PlayerPacket.PLAYER_REGISTER;
 						cRequest.hostName = java.net.InetAddress.getLocalHost().getHostName();
 						cRequest.playerName = name;
 						cRequest.listenPort = listenPort;
-						cRequest.uID = "";
+						cRequest.uID = uID;
 
-						ObjectOutputStream toServer = new ObjectOutputStream(sendSocket.getOutputStream());
+						ObjectOutputStream toLeader = new ObjectOutputStream(sendSocket.getOutputStream());
 
-						toServer.writeObject(cRequest);
-
+						toLeader.writeObject(cRequest);
+	
 						Socket receiveSocket = listenSocket.accept();
-						ObjectInputStream fromServer = new ObjectInputStream(receiveSocket.getInputStream());
+						ObjectInputStream fromLeader = new ObjectInputStream(receiveSocket.getInputStream());
 
-						while( (cResponse = (PlayerPacket) fromServer.readObject()) != null) {
+						while( ((cResponse = (PlayerPacket) fromLeader.readObject()) != null)) {
 
 							// This particular type of packet is only sent to players
 							// who are not the very first player. This ensures that the
 							// random number generator places everyone in the same positions
 							// on the map. We basically draw all players in the order
-							// that they joined based on a unique ID assigned by the server
+							// that they joined based on the order their requests arrive
+							// at the fake leader
 							if (cResponse.type == PlayerPacket.PLAYER_REGISTER_UPDATE) {
 								Client newClient = new RemoteClient(cResponse.playerName);
 								maze.addClient(newClient);
 
 								// Add the client to our playerList so we can keep track
 								// of them when we update the map in the future
-								// existingPlayers.put(cResponse.uID, newClient);
+							 	existingPlayers.put(cResponse.uID, newClient);
+								MazeLeader.actionLog.put((cResponse.prevLogIndex + 1), cResponse);
 
-								continue;
 							} else if (cResponse.type == PlayerPacket.PLAYER_REGISTER_REPLY) {
-								tempID = cResponse.uID; // Save the uID
-
-								break;
-							} else {
-								continue;
+								//tempID = cResponse.uID; // Save the uID
+								cResponse.type = PlayerPacket.PLAYER_REGISTER_UPDATE;
+								MazeLeader.actionLog.put((cResponse.prevLogIndex + 1), cResponse);
 							}
+
+							if(MazeLeader.actionLog.size() == numPlayers)
+								break;
 						}
 
-						toServer.close();
-						fromServer.close();
+
+						System.out.println("HERE");
+
+						new MazeLeader(leaderPort, numPlayers).start();
+						
+						toLeader.close();
+						fromLeader.close();
 						receiveSocket.close();
 						listenSocket.close();
 						sendSocket.close();
 
-						// Spawn a thread to handle broadcasted updates from the server
+						// Spawn a thread to handle broadcasted updates from the leader
 						new ClientUpdateHandler(maze, listenPort).start();
 					}
 				} catch (IOException e) {
@@ -263,22 +303,35 @@ public class Mazewar extends JFrame {
 					System.exit(-1);
 				}
 
-				uID = tempID;
-			
 				System.out.println("Player " + name + " registered.");
 
                 // Create the GUIClient and connect it to the KeyListener queue
-                guiClient = new GUIClient(name);
-                maze.addClient(guiClient);
-                this.addKeyListener(guiClient);
 
-				//ClientUpdateHandler.playerList.put(uID, guiClient);
+				try {
+					if(!leaderName.equals(java.net.InetAddress.getLocalHost().getHostName())) {
+                		guiClient = new GUIClient(name);
+                		maze.addClient(guiClient);
+                		this.addKeyListener(guiClient);
+						existingPlayers.put(uID, guiClient);
+					}
+				} catch (UnknownHostException e) {
+					System.err.println("Unknwon Host at Mazewar.java line 309");
+					System.exit(-1);
+				}
+				
+				if(existingPlayers.size() < numPlayers) {
+					System.err.println("Timeout occured. Exiting game");
+					
+					System.exit(1);
+				}
+
+				ClientUpdateHandler.playerList.put(uID, guiClient);
 
 				// Add all existing users who joined before us to the playerList.
 				// This is used by the ClientUpdateHandlerThread
-				/*for (Map.Entry<Integer, Client> ePlayer : existingPlayers.entrySet()) {
+				for (Map.Entry<String, Client> ePlayer : existingPlayers.entrySet()) {
 					ClientUpdateHandler.playerList.put(ePlayer.getKey(), ePlayer.getValue());
-				}*/
+				}
                 
                 // Use braces to force constructors not to be called at the beginning of the
                 // constructor.
@@ -349,13 +402,103 @@ public class Mazewar extends JFrame {
                 this.requestFocusInWindow();
         }
         
+		private static void handlePlayerConnect(ServerSocket listenSocket, ConcurrentSkipListMap<Integer, PlayerPacket> actionLog, ConcurrentSkipListMap<String, Client> playerList, Maze maze) {
+			try {
+				Socket listener = listenSocket.accept();
+				ObjectInputStream fromPlayer = new ObjectInputStream(listener.getInputStream());
+				PlayerPacket pPacket = null;
+
+				ObjectOutputStream toNewPlayer = null;
+				Socket newPlayer = null;
+
+				ObjectOutputStream broadCast = null;
+				Socket bPlayer = null;
+
+				int pCount = 0;
+				int prevLogIndex = 0;
+
+				// Wait for packets to arrive from clients
+				while ((pPacket = (PlayerPacket) fromPlayer.readObject()) != null) {
+					PlayerPacket cPacket = new PlayerPacket();
+
+					// If arriving packet is of type PLAYER_REGISTER then 
+					// we need to update all existing clients, plus
+					// inform the new client of the order of player joins
+					if(pPacket.type == PlayerPacket.PLAYER_REGISTER) {
+						
+						newPlayer = new Socket(pPacket.hostName, pPacket.listenPort);
+						toNewPlayer = new ObjectOutputStream(newPlayer.getOutputStream());
+						
+						Client newClient = new RemoteClient(pPacket.playerName);
+						maze.addClient(newClient);
+
+						playerList.put(pPacket.uID, newClient);
+						pPacket.type = PlayerPacket.PLAYER_REGISTER_UPDATE;
+						actionLog.put((actionLog.size()+1), pPacket);
+
+						for (Map.Entry<Integer, PlayerPacket> logEvent : actionLog.entrySet()) {
+							PlayerPacket updatePlayer = new PlayerPacket();
+
+							updatePlayer = logEvent.getValue();
+
+							if(!(updatePlayer.uID.equals(pPacket.uID)) && !(updatePlayer.uID.equals(uID))) {
+								bPlayer = new Socket(updatePlayer.hostName, updatePlayer.listenPort);
+								broadCast = new ObjectOutputStream(bPlayer.getOutputStream());
+
+								broadCast.writeObject(updatePlayer);
+
+								broadCast.close();
+								bPlayer.close();
+							}
+						}
+
+						for(Map.Entry<Integer, PlayerPacket> logEvent : actionLog.entrySet()) {
+							PlayerPacket updatePlayer = new PlayerPacket();
+
+							updatePlayer = logEvent.getValue();
+							updatePlayer.prevLogIndex = prevLogIndex;
+
+							if(updatePlayer.uID.equals(pPacket.uID)) {
+								updatePlayer.type = PlayerPacket.PLAYER_REGISTER_REPLY;
+							}
+							
+							toNewPlayer.writeObject(updatePlayer);
+
+							prevLogIndex++;
+						}
+
+						prevLogIndex = 0;
+
+						toNewPlayer.close();
+						newPlayer.close();
+					}
+						
+
+					fromPlayer.close();
+					listener.close();
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+
         /**
          * Entry point for the game.  
          * @param args Command-line arguments.
          */
         public static void main(String args[]) {
 
-                /* Create the GUI */
-                new Mazewar(Integer.parseInt(args[0]), args[1], Integer.parseInt(args[2]));
+			/* Create the GUI */
+			if(args.length != 3) {
+				System.out.println("Invalid number of arguments passed in!");
+				System.out.println("Usage: java Mazwar <leaderName> <listenPort> <numPlayers>");
+				System.exit(0);
+			} else
+				if(!args[1].equals("3030"))
+            		new Mazewar(args[0], Integer.parseInt(args[1]), Integer.parseInt(args[2]));
+				else {
+					System.out.println("ERROR: Cannot use Port 3030 to listen on, reserved for Mazewar protocol!");
+					System.exit(0);
+				}
         }
 }

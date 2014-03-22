@@ -7,7 +7,7 @@ public class ClientUpdateHandler extends Thread {
 
 	Maze maze = null;
 	int listenPort;
-	public static ConcurrentSkipListMap<Integer, Client> playerList = new ConcurrentSkipListMap<Integer, Client>();
+	public static ConcurrentSkipListMap<String, Client> playerList = new ConcurrentSkipListMap<String, Client>();
 
 	public ClientUpdateHandler (Maze maze, int listenPort) {
 		super("ClientUpdateHandler");

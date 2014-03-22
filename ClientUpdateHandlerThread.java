@@ -41,7 +41,7 @@ public class ClientUpdateHandlerThread extends Thread {
 
 					break;
 				} else if (pPacket.type == PlayerPacket.PLAYER_FORWARD) {
-					//Client updateClient = ClientUpdateHandler.playerList.get(pPacket.uID);
+					Client updateClient = ClientUpdateHandler.playerList.get(pPacket.uID);
 
 					// Process a request for ourselves or a remote client. Doesn't matter
 					// these methods were just removed from Client.java and placed here. Functions
@@ -53,26 +53,26 @@ public class ClientUpdateHandlerThread extends Thread {
 					break;
 				} else if (pPacket.type == PlayerPacket.PLAYER_BACKUP) {
 
-					//Client updateClient = ClientUpdateHandler.playerList.get(pPacket.uID);
+					Client updateClient = ClientUpdateHandler.playerList.get(pPacket.uID);
 
 					if(maze.moveClientBackward(updateClient)) {
                         updateClient.notifyMoveBackward();
 					}
 					break;
                 } else if (pPacket.type == PlayerPacket.PLAYER_LEFT) {
-					//Client updateClient = ClientUpdateHandler.playerList.get(pPacket.uID);
+					Client updateClient = ClientUpdateHandler.playerList.get(pPacket.uID);
 
                 	updateClient.notifyTurnLeft();
 
 					break;
 				} else if (pPacket.type == PlayerPacket.PLAYER_RIGHT) {	
-					//Client updateClient = ClientUpdateHandler.playerList.get(pPacket.uID);
+					Client updateClient = ClientUpdateHandler.playerList.get(pPacket.uID);
 
                 	updateClient.notifyTurnRight();
 
 					break;
 				} else if (pPacket.type == PlayerPacket.PLAYER_FIRE) {
-					//Client updateClient = ClientUpdateHandler.playerList.get(pPacket.uID);
+					Client updateClient = ClientUpdateHandler.playerList.get(pPacket.uID);
 
 					// Not going to handle this in a complex way, as it stands this will simply
 					// compute where the projectile will be based on our own counter. Should
@@ -86,7 +86,7 @@ public class ClientUpdateHandlerThread extends Thread {
 
 					System.out.println("Player quit..Ending game...");
 
-					if(pPacket.uID == -1) {
+					if(pPacket.uID == "") {
 						Mazewar.quit(1);
 					} else {
 						Mazewar.quit(0);
