@@ -21,7 +21,7 @@ public class MazeLeaderProcessor extends Thread {
 					toProcess = (PlayerPacket) MazeLeader.requestLog.take();
 
 					// Small check to see if anyone else is already registered
-					if (MazeLeader.playerList.size() > 1) {
+					if (MazeLeader.playerList.size() > 0) {
 						updateNewPlayer(toProcess);
 						
 						broadCastAction(toProcess, 1);

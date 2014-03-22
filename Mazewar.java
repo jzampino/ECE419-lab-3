@@ -262,6 +262,7 @@ public class Mazewar extends JFrame {
 
 								// Add the client to our playerList so we can keep track
 								// of them when we update the map in the future
+								System.out.println(cResponse.uID + " " + newClient);
 							 	existingPlayers.put(cResponse.uID, newClient);
 								MazeLeader.actionLog.put((cResponse.prevLogIndex + 1), cResponse);
 
@@ -269,14 +270,12 @@ public class Mazewar extends JFrame {
 								//tempID = cResponse.uID; // Save the uID
 								cResponse.type = PlayerPacket.PLAYER_REGISTER_UPDATE;
 								MazeLeader.actionLog.put((cResponse.prevLogIndex + 1), cResponse);
+								break;
 							}
 
-							if(MazeLeader.actionLog.size() == numPlayers)
-								break;
+							/*if(MazeLeader.actionLog.size() == numPlayers)
+								break;*/
 						}
-
-
-						System.out.println("HERE");
 
 						new MazeLeader(leaderPort, numPlayers).start();
 						

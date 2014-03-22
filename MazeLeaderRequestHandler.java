@@ -31,6 +31,7 @@ public class MazeLeaderRequestHandler extends Thread {
 						pInfo.hostName = pPacket.hostName;
 						pInfo.playerName = pPacket.playerName;
 						//pInfo.uID = MazeLeader.pCount;
+						pInfo.uID = pPacket.uID;
 						pInfo.listenPort = pPacket.listenPort;
 					}
 					else {
@@ -46,7 +47,7 @@ public class MazeLeaderRequestHandler extends Thread {
 					//cPacket.uID = MazeLeader.pCount;
 					cPacket.uID = pPacket.uID;
 
-					System.out.println("Registered user: " + pPacket.playerName + ", from: " + pPacket.hostName);
+					System.out.println("Registered user: " + pPacket.uID + ", from: " + pPacket.hostName + ":" + pPacket.listenPort );
 
 					// Add request to FIFO, should cause handler thread to wake up
 					MazeLeader.requestLog.put(cPacket);
