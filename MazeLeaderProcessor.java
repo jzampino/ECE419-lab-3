@@ -77,7 +77,7 @@ public class MazeLeaderProcessor extends Thread {
 			for (Map.Entry<String, PlayerInfo> player : MazeLeader.playerList.entrySet()) {
 				pInfo = player.getValue();
 
-				if(!pInfo.uID.equals(pAction.uID) && !pInfo.uID.equals(Mazewar.uID)) {
+				if(!pInfo.uID.equals(pAction.uID)) {
 	
 					Socket socket = new Socket(pInfo.hostName, pInfo.listenPort);
 

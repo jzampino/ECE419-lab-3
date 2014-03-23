@@ -234,7 +234,6 @@ public class Mazewar extends JFrame {
 							
 								for (Map.Entry<Integer, PlayerPacket> logEvent : MazeLeader.actionLog.entrySet()) {
 									if(!existingPlayers.containsKey(logEvent.getValue().uID)) {
-										System.out.println(logEvent.getKey());
 										Client newClient = new RemoteClient(logEvent.getValue().playerName);
 										existingPlayers.put(logEvent.getValue().uID, newClient);
 										maze.addClient(newClient);
