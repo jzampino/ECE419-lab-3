@@ -13,36 +13,37 @@ public class MazeLeaderProcessor extends Thread {
 				// This thread basically peeks the head of the FIFO and checks to see if
 				// there are any pending requests, if not, it will keep looping.
 				PlayerPacket toProcess = (PlayerPacket) MazeLeader.requestLog.peek();
-				
-				if(toProcess == null)
-					continue;
 
-				if(toProcess.type == PlayerPacket.PLAYER_REGISTER_REPLY) {
-					toProcess = (PlayerPacket) MazeLeader.requestLog.take();
+				if(toProcess != null) {
 
-					// Small check to see if anyone else is already registered
-					if (MazeLeader.playerList.size() > 0) {
-						updateNewPlayer(toProcess);
-						
-						broadCastAction(toProcess, 1);
-					} else {
-						broadCastAction(toProcess, 0);
-					}
-
-				} else {
-					// Check to see if the playerList has numPlayers in it
-					if(MazeLeader.playerList.size() == MazeLeader.numPlayers || toProcess.type == PlayerPacket.PLAYER_QUIT) {
+					if(toProcess.type == PlayerPacket.PLAYER_REGISTER_REPLY) {
 						toProcess = (PlayerPacket) MazeLeader.requestLog.take();
+	
+						// Small check to see if anyone else is already registered
+						if (MazeLeader.playerList.size() > 0) {
+							updateNewPlayer(toProcess);
 						
-						broadCastAction(toProcess, 0);
+							broadCastAction(toProcess, 1);
 
-						if(MazeLeader.playerList.size() == 0) {
-							System.out.println("All players quit, next join will start a new game");
+						} else {
+							broadCastAction(toProcess, 0);
 						}
+	
 					} else {
-						toProcess = (PlayerPacket) MazeLeader.requestLog.take();
-						System.out.println("Num Players: " + MazeLeader.numPlayers + " Player List Size: " + MazeLeader.playerList.size());
-						System.out.println("Waiting for " + (MazeLeader.numPlayers - MazeLeader.playerList.size()) + " more players, discarding request");
+						// Check to see if the playerList has numPlayers in it
+						if(MazeLeader.playerList.size() == MazeLeader.numPlayers || toProcess.type == PlayerPacket.PLAYER_QUIT) {
+							toProcess = (PlayerPacket) MazeLeader.requestLog.take();
+						
+							broadCastAction(toProcess, 0);
+
+							if(MazeLeader.playerList.size() == 0) {
+								System.out.println("All players quit, next join will start a new game");
+							}
+						} else {
+							toProcess = (PlayerPacket) MazeLeader.requestLog.take();
+							System.out.println("Num Players: " + MazeLeader.numPlayers + " Player List Size: " + MazeLeader.playerList.size());
+							System.out.println("Waiting for " + (MazeLeader.numPlayers - MazeLeader.playerList.size()) + " more players, discarding request");
+						}
 					}
 				}
 			}
@@ -76,7 +77,7 @@ public class MazeLeaderProcessor extends Thread {
 			for (Map.Entry<String, PlayerInfo> player : MazeLeader.playerList.entrySet()) {
 				pInfo = player.getValue();
 
-				if(!pInfo.uID.equals(pAction.uID)) {
+				if(!pInfo.uID.equals(pAction.uID) && !pInfo.uID.equals(Mazewar.uID)) {
 	
 					Socket socket = new Socket(pInfo.hostName, pInfo.listenPort);
 
@@ -111,7 +112,7 @@ public class MazeLeaderProcessor extends Thread {
 			updatePlayer.hostName = pInfo.hostName;
 			updatePlayer.playerName = pInfo.playerName;
 			updatePlayer.uID = pInfo.uID;
-			updatePlayer.prevLogIndex = prevLogIndex;
+			updatePlayer.prevLogIndex = player.getKey() - 1;
 
 			if(pInfo.uID == pAction.uID) {
 				updatePlayer.type = PlayerPacket.PLAYER_REGISTER_REPLY;

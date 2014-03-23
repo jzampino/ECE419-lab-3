@@ -53,6 +53,7 @@ public class MazeLeaderRequestHandler extends Thread {
 
 					// Add request to FIFO, should cause handler thread to wake up
 					MazeLeader.requestLog.put(cPacket);
+					System.out.println("SERVER: numrequests " + numRequests);
 					MazeLeader.actionLog.put(numRequests, cPacket);
 
 					break;
@@ -66,6 +67,7 @@ public class MazeLeaderRequestHandler extends Thread {
 
 					numRequests++;
 					MazeLeader.requestLog.put(pPacket);
+					MazeLeader.actionLog.put(numRequests, cPacket);
 
 					break;
 				}

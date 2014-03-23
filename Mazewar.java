@@ -214,6 +214,7 @@ public class Mazewar extends JFrame {
 						pInfo.listenPort = listenPort;
 
 						new MazeLeader(leaderPort, numPlayers).start();
+						new ClientUpdateHandler(maze, listenPort).start();
 					 	existingPlayers.put(uID, guiClient);
 						MazeLeader.playerList.put(pInfo.uID, pInfo);
 						MazeLeader.actionLog.put(pAction.prevLogIndex, pAction);
@@ -222,7 +223,6 @@ public class Mazewar extends JFrame {
 							//handlePlayerConnect(listenSocket, actionLog, existingPlayers, maze);
 							for (Map.Entry<Integer, PlayerPacket> logEvent : MazeLeader.actionLog.entrySet()) {
 								if(!existingPlayers.containsKey(logEvent.getValue().uID)) {
-									System.out.println(logEvent.getValue().uID);
 									Client newClient = new RemoteClient(logEvent.getValue().playerName);
 									existingPlayers.put(logEvent.getValue().uID, newClient);
 									maze.addClient(newClient);
@@ -234,7 +234,7 @@ public class Mazewar extends JFrame {
 							
 								for (Map.Entry<Integer, PlayerPacket> logEvent : MazeLeader.actionLog.entrySet()) {
 									if(!existingPlayers.containsKey(logEvent.getValue().uID)) {
-										System.out.println(logEvent.getValue().uID);
+										System.out.println(logEvent.getKey());
 										Client newClient = new RemoteClient(logEvent.getValue().playerName);
 										existingPlayers.put(logEvent.getValue().uID, newClient);
 										maze.addClient(newClient);
@@ -245,7 +245,6 @@ public class Mazewar extends JFrame {
 							}
 						}
 
-						new ClientUpdateHandler(maze, listenPort).start();
 						//Socket sendSocket = new Socket(java.net.InetAddress.getLocalHost().getHostName(), listenPort);
 					} else {
 
