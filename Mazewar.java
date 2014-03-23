@@ -194,6 +194,8 @@ public class Mazewar extends JFrame {
 					// Check if the name of the name of the leader machine passed in is our own
 					// if so, we are the first player in the game.
 					if((leaderName.equals(java.net.InetAddress.getLocalHost().getHostName()))) {
+						System.out.println("Mazewar starting. Localhost acting as preliminary leader");
+
                 		guiClient = new GUIClient(name);
                 		maze.addClient(guiClient);
                 		this.addKeyListener(guiClient);
@@ -205,18 +207,41 @@ public class Mazewar extends JFrame {
 						pAction.type = PlayerPacket.PLAYER_REGISTER_UPDATE;
 						pAction.prevLogIndex = 1;
 
+						PlayerInfo pInfo = new PlayerInfo();
+						pInfo.hostName = leaderName;
+						pInfo.playerName = name;
+						pInfo.uID = uID;
+						pInfo.listenPort = listenPort;
+
 						new MazeLeader(leaderPort, numPlayers).start();
 					 	existingPlayers.put(uID, guiClient);
+						MazeLeader.playerList.put(pInfo.uID, pInfo);
 						MazeLeader.actionLog.put(pAction.prevLogIndex, pAction);
 
-						while(MazeLeader.actionLog.size() < numPlayers) {
+						while(MazeLeader.actionLog.size() <= numPlayers) {
 							//handlePlayerConnect(listenSocket, actionLog, existingPlayers, maze);
 							for (Map.Entry<Integer, PlayerPacket> logEvent : MazeLeader.actionLog.entrySet()) {
 								if(!existingPlayers.containsKey(logEvent.getValue().uID)) {
+									System.out.println(logEvent.getValue().uID);
 									Client newClient = new RemoteClient(logEvent.getValue().playerName);
 									existingPlayers.put(logEvent.getValue().uID, newClient);
 									maze.addClient(newClient);
 								}
+							}
+
+							if(MazeLeader.actionLog.size() == numPlayers) {
+								System.out.println("Everyone Joined! Game beginning...");
+							
+								for (Map.Entry<Integer, PlayerPacket> logEvent : MazeLeader.actionLog.entrySet()) {
+									if(!existingPlayers.containsKey(logEvent.getValue().uID)) {
+										System.out.println(logEvent.getValue().uID);
+										Client newClient = new RemoteClient(logEvent.getValue().playerName);
+										existingPlayers.put(logEvent.getValue().uID, newClient);
+										maze.addClient(newClient);
+									}
+								}		
+								
+								break;
 							}
 						}
 
@@ -262,7 +287,7 @@ public class Mazewar extends JFrame {
 
 								// Add the client to our playerList so we can keep track
 								// of them when we update the map in the future
-								System.out.println(cResponse.uID + " " + newClient);
+								System.out.println("Added player: " + cResponse.playerName + " from:" + cResponse.uID );
 							 	existingPlayers.put(cResponse.uID, newClient);
 								MazeLeader.actionLog.put((cResponse.prevLogIndex + 1), cResponse);
 
@@ -302,7 +327,7 @@ public class Mazewar extends JFrame {
 					System.exit(-1);
 				}
 
-				System.out.println("Player " + name + " registered.");
+				System.out.println("Local Player " + name + " registered.");
 
                 // Create the GUIClient and connect it to the KeyListener queue
 
@@ -318,11 +343,11 @@ public class Mazewar extends JFrame {
 					System.exit(-1);
 				}
 				
-				if(existingPlayers.size() < numPlayers) {
+				/*if(existingPlayers.size() < numPlayers) {
 					System.err.println("Timeout occured. Exiting game");
 					
 					System.exit(1);
-				}
+				}*/
 
 				ClientUpdateHandler.playerList.put(uID, guiClient);
 
@@ -401,86 +426,6 @@ public class Mazewar extends JFrame {
                 this.requestFocusInWindow();
         }
         
-		private static void handlePlayerConnect(ServerSocket listenSocket, ConcurrentSkipListMap<Integer, PlayerPacket> actionLog, ConcurrentSkipListMap<String, Client> playerList, Maze maze) {
-			try {
-				Socket listener = listenSocket.accept();
-				ObjectInputStream fromPlayer = new ObjectInputStream(listener.getInputStream());
-				PlayerPacket pPacket = null;
-
-				ObjectOutputStream toNewPlayer = null;
-				Socket newPlayer = null;
-
-				ObjectOutputStream broadCast = null;
-				Socket bPlayer = null;
-
-				int pCount = 0;
-				int prevLogIndex = 0;
-
-				// Wait for packets to arrive from clients
-				while ((pPacket = (PlayerPacket) fromPlayer.readObject()) != null) {
-					PlayerPacket cPacket = new PlayerPacket();
-
-					// If arriving packet is of type PLAYER_REGISTER then 
-					// we need to update all existing clients, plus
-					// inform the new client of the order of player joins
-					if(pPacket.type == PlayerPacket.PLAYER_REGISTER) {
-						
-						newPlayer = new Socket(pPacket.hostName, pPacket.listenPort);
-						toNewPlayer = new ObjectOutputStream(newPlayer.getOutputStream());
-						
-						Client newClient = new RemoteClient(pPacket.playerName);
-						maze.addClient(newClient);
-
-						playerList.put(pPacket.uID, newClient);
-						pPacket.type = PlayerPacket.PLAYER_REGISTER_UPDATE;
-						actionLog.put((actionLog.size()+1), pPacket);
-
-						for (Map.Entry<Integer, PlayerPacket> logEvent : actionLog.entrySet()) {
-							PlayerPacket updatePlayer = new PlayerPacket();
-
-							updatePlayer = logEvent.getValue();
-
-							if(!(updatePlayer.uID.equals(pPacket.uID)) && !(updatePlayer.uID.equals(uID))) {
-								bPlayer = new Socket(updatePlayer.hostName, updatePlayer.listenPort);
-								broadCast = new ObjectOutputStream(bPlayer.getOutputStream());
-
-								broadCast.writeObject(updatePlayer);
-
-								broadCast.close();
-								bPlayer.close();
-							}
-						}
-
-						for(Map.Entry<Integer, PlayerPacket> logEvent : actionLog.entrySet()) {
-							PlayerPacket updatePlayer = new PlayerPacket();
-
-							updatePlayer = logEvent.getValue();
-							updatePlayer.prevLogIndex = prevLogIndex;
-
-							if(updatePlayer.uID.equals(pPacket.uID)) {
-								updatePlayer.type = PlayerPacket.PLAYER_REGISTER_REPLY;
-							}
-							
-							toNewPlayer.writeObject(updatePlayer);
-
-							prevLogIndex++;
-						}
-
-						prevLogIndex = 0;
-
-						toNewPlayer.close();
-						newPlayer.close();
-					}
-						
-
-					fromPlayer.close();
-					listener.close();
-				}
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
-
         /**
          * Entry point for the game.  
          * @param args Command-line arguments.

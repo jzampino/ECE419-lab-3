@@ -28,11 +28,14 @@ public class ClientUpdateHandlerThread extends Thread {
 				// as key and add them to the maze. Remote clients are purple.
 				if(pPacket.type == PlayerPacket.PLAYER_REGISTER_REPLY || pPacket.type == PlayerPacket.PLAYER_REGISTER_UPDATE) {
 
+					if(Mazewar.existingPlayers.containsKey(pPacket.uID))
+						break;
+
 					System.out.println("Received Join from Player: " + pPacket.playerName);
 
 					Client newClient = new RemoteClient(pPacket.playerName);
 
-					//ClientUpdateHandler.playerList.put(pPacket.uID, newClient);
+					ClientUpdateHandler.playerList.put(pPacket.uID, newClient);
 
 					maze.addClient(newClient);
 

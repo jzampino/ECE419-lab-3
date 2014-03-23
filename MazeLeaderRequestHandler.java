@@ -17,6 +17,7 @@ public class MazeLeaderRequestHandler extends Thread {
 		try {
 			ObjectInputStream fromPlayer = new ObjectInputStream(socket.getInputStream());
 			PlayerPacket pPacket;
+			int numRequests = MazeLeader.actionLog.size();
 
 			while( (pPacket = (PlayerPacket) fromPlayer.readObject()) != null) {
 
@@ -26,11 +27,12 @@ public class MazeLeaderRequestHandler extends Thread {
 				// Only need to do fancy things for a registration request. Simply set up the PlayerInfo object
 				// to add to the PlayerList and we are good to go
 				if(pPacket.type == PlayerPacket.PLAYER_REGISTER) {
+					numRequests++;
+
 					if(!MazeLeader.playerList.containsKey(pPacket.uID)) {
 						MazeLeader.pCount++;
 						pInfo.hostName = pPacket.hostName;
 						pInfo.playerName = pPacket.playerName;
-						//pInfo.uID = MazeLeader.pCount;
 						pInfo.uID = pPacket.uID;
 						pInfo.listenPort = pPacket.listenPort;
 					}
@@ -51,6 +53,7 @@ public class MazeLeaderRequestHandler extends Thread {
 
 					// Add request to FIFO, should cause handler thread to wake up
 					MazeLeader.requestLog.put(cPacket);
+					MazeLeader.actionLog.put(numRequests, cPacket);
 
 					break;
 				} else if (pPacket.type == PlayerPacket.PLAYER_QUIT) { 
@@ -60,6 +63,8 @@ public class MazeLeaderRequestHandler extends Thread {
 
 					break;
 				} else {
+
+					numRequests++;
 					MazeLeader.requestLog.put(pPacket);
 
 					break;

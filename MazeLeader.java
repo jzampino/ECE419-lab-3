@@ -17,11 +17,14 @@ public class MazeLeader extends Thread {
 	// numPlayers long
 	public static int numPlayers = 0;
 	private static ServerSocket serverSocket = null;
+	public static int state;
 
 	public MazeLeader(int socket, int numPlayers) {
 
 		try {
 			serverSocket = new ServerSocket(socket);
+			state = RAFTState.RAFT_INTERMEDIATE;
+			this.numPlayers = numPlayers;
 			new MazeLeaderProcessor().start();
 		}
 		catch (IOException e) {
@@ -53,42 +56,3 @@ public class MazeLeader extends Thread {
 		}
 	}
 }
-
-/*class MazeLeaderShutdown implements Runnable {
-
-	private ServerSocket serverSocket;
-
-	public MazeLeaderShutdown (ServerSocket serverSocket) {
-		this.serverSocket = serverSocket;
-	}
-
-	@Override
-	public void run() {
-		System.out.println("Shutting down server, sending disconnect to all players");
-
-		PlayerInfo pInfo = new PlayerInfo();
-		PlayerPacket pAction = new PlayerPacket();
-
-		pAction.type = PlayerPacket.PLAYER_QUIT;
-		pAction.uID = "";
-
-		try {
-			for (Map.Entry<Integer, PlayerInfo> player : MazeLeader.playerList.entrySet()) {
-				pInfo = player.getValue();
-
-				Socket socket = new Socket(pInfo.hostName, pInfo.listenPort);
-
-				ObjectOutputStream toClient = new ObjectOutputStream(socket.getOutputStream());
-
-				toClient.writeObject(pAction);
-
-				toClient.close();
-				socket.close();
-			}
-
-			serverSocket.close();
-		} catch (IOException e) {
-		}
-	}
-}*/
-

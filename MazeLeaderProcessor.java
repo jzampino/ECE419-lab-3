@@ -41,6 +41,7 @@ public class MazeLeaderProcessor extends Thread {
 						}
 					} else {
 						toProcess = (PlayerPacket) MazeLeader.requestLog.take();
+						System.out.println("Num Players: " + MazeLeader.numPlayers + " Player List Size: " + MazeLeader.playerList.size());
 						System.out.println("Waiting for " + (MazeLeader.numPlayers - MazeLeader.playerList.size()) + " more players, discarding request");
 					}
 				}
@@ -93,14 +94,16 @@ public class MazeLeaderProcessor extends Thread {
 	// Send update packets to the new player so they have an up-to-date map and place
 	// themselves in the correct spot
 	private void updateNewPlayer(PlayerPacket pAction) throws IOException {
-		PlayerInfo pInfo = null;
+		PlayerPacket pInfo = null;
 		Socket newPlayer = null;
 		ObjectOutputStream toNewPlayer = null;
+		int prevLogIndex = 0;
+
 					
 		newPlayer = new Socket(pAction.hostName, pAction.listenPort);
 		toNewPlayer = new ObjectOutputStream(newPlayer.getOutputStream());
 
-		for(Map.Entry<String, PlayerInfo> player : MazeLeader.playerList.entrySet()) {
+		for(Map.Entry<Integer, PlayerPacket> player : MazeLeader.actionLog.entrySet()) {
 			pInfo = player.getValue();
 
 			PlayerPacket updatePlayer = new PlayerPacket();
@@ -108,6 +111,7 @@ public class MazeLeaderProcessor extends Thread {
 			updatePlayer.hostName = pInfo.hostName;
 			updatePlayer.playerName = pInfo.playerName;
 			updatePlayer.uID = pInfo.uID;
+			updatePlayer.prevLogIndex = prevLogIndex;
 
 			if(pInfo.uID == pAction.uID) {
 				updatePlayer.type = PlayerPacket.PLAYER_REGISTER_REPLY;
@@ -116,6 +120,8 @@ public class MazeLeaderProcessor extends Thread {
 			}
 
 			toNewPlayer.writeObject(updatePlayer);
+
+			prevLogIndex++;
 		}
 
 		toNewPlayer.close();
