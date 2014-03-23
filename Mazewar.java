@@ -139,7 +139,10 @@ public class Mazewar extends JFrame {
 					toLeader.close();
 					socket.close();
 
-                	System.exit(0);
+					while(true) {
+						if((MazeLeader.playerList.size() == 0) || !leaderName.equals(java.net.InetAddress.getLocalHost().getHostName()))
+                			System.exit(0);
+					}
 				} catch (IOException e) {
 					e.printStackTrace();
 					System.exit(0);
@@ -220,7 +223,6 @@ public class Mazewar extends JFrame {
 						MazeLeader.actionLog.put(pAction.prevLogIndex, pAction);
 
 						while(MazeLeader.actionLog.size() <= numPlayers) {
-							//handlePlayerConnect(listenSocket, actionLog, existingPlayers, maze);
 							for (Map.Entry<Integer, PlayerPacket> logEvent : MazeLeader.actionLog.entrySet()) {
 								if(!existingPlayers.containsKey(logEvent.getValue().uID)) {
 									Client newClient = new RemoteClient(logEvent.getValue().playerName);
@@ -243,11 +245,10 @@ public class Mazewar extends JFrame {
 								break;
 							}
 						}
-
-						//Socket sendSocket = new Socket(java.net.InetAddress.getLocalHost().getHostName(), listenPort);
 					} else {
 
 						ConcurrentSkipListMap<Integer, PlayerPacket> actionList = new ConcurrentSkipListMap<Integer, PlayerPacket>();
+						new MazeLeader(leaderPort, numPlayers).start();
 
 						ServerSocket listenSocket = new ServerSocket(listenPort);
 						Socket sendSocket = new Socket(leaderName, 3040);
@@ -289,18 +290,31 @@ public class Mazewar extends JFrame {
 							 	existingPlayers.put(cResponse.uID, newClient);
 								MazeLeader.actionLog.put((cResponse.prevLogIndex + 1), cResponse);
 
+								if(!MazeLeader.playerList.containsKey(cResponse.uID)) {
+									PlayerInfo pInfo = new PlayerInfo();
+									pInfo.hostName = cResponse.hostName;
+									pInfo.playerName = cResponse.playerName;
+									pInfo.uID = cResponse.uID;
+									pInfo.listenPort = cResponse.listenPort;
+									MazeLeader.playerList.put(cResponse.uID, pInfo);
+								}
+
 							} else if (cResponse.type == PlayerPacket.PLAYER_REGISTER_REPLY) {
-								//tempID = cResponse.uID; // Save the uID
 								cResponse.type = PlayerPacket.PLAYER_REGISTER_UPDATE;
 								MazeLeader.actionLog.put((cResponse.prevLogIndex + 1), cResponse);
+							
+								if(!MazeLeader.playerList.containsKey(cResponse.uID)) {
+									PlayerInfo pInfo = new PlayerInfo();
+									pInfo.hostName = cResponse.hostName;
+									pInfo.playerName = cResponse.playerName;
+									pInfo.uID = cResponse.uID;
+									pInfo.listenPort = cResponse.listenPort;
+									MazeLeader.playerList.put(cResponse.uID, pInfo);
+								}
+								
 								break;
 							}
-
-							/*if(MazeLeader.actionLog.size() == numPlayers)
-								break;*/
 						}
-
-						new MazeLeader(leaderPort, numPlayers).start();
 						
 						toLeader.close();
 						fromLeader.close();
@@ -341,12 +355,6 @@ public class Mazewar extends JFrame {
 					System.exit(-1);
 				}
 				
-				/*if(existingPlayers.size() < numPlayers) {
-					System.err.println("Timeout occured. Exiting game");
-					
-					System.exit(1);
-				}*/
-
 				ClientUpdateHandler.playerList.put(uID, guiClient);
 
 				// Add all existing users who joined before us to the playerList.
@@ -364,7 +372,6 @@ public class Mazewar extends JFrame {
                         maze.addClient(new RobotClient("Marvin"));
                 }*/
 
-                
                 // Create the panel that will display the maze.
                 overheadPanel = new OverheadMazePanel(maze, guiClient);
                 assert(overheadPanel != null);

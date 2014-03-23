@@ -39,6 +39,15 @@ public class ClientUpdateHandlerThread extends Thread {
 
 					maze.addClient(newClient);
 
+					if(!MazeLeader.playerList.containsKey(pPacket.uID)) {
+						PlayerInfo pInfo = new PlayerInfo();
+						pInfo.uID = pPacket.uID;
+						pInfo.playerName = pPacket.playerName;
+						pInfo.hostName = pPacket.hostName;
+						pInfo.listenPort = pPacket.listenPort;
+						MazeLeader.playerList.put(pInfo.uID, pInfo);
+					}
+
 					fromServer.close();
 					socket.close();
 
