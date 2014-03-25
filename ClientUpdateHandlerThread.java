@@ -2,15 +2,20 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.Map;
 
 public class ClientUpdateHandlerThread extends Thread {
 
-	private Socket socket = null;
+	//private Socket socket = null;
 	private Maze maze = null;
 
-	public ClientUpdateHandlerThread(Socket socket, Maze maze) {
+	public static LinkedBlockingQueue<PlayerPacket> requestLog = new LinkedBlockingQueue<PlayerPacket>();
+	public static ConcurrentSkipListMap<Integer, PlayerPacket> actionLog = new ConcurrentSkipListMap<Integer, PlayerPacket>();
+	public static ConcurrentSkipListMap<String, Client> playerList = new ConcurrentSkipListMap<String, Client>();
+
+	//public ClientUpdateHandlerThread(Socket socket, Maze maze) {
+	public ClientUpdateHandlerThread(Maze maze) {
 		super("ClientUpdateHandler");
-		this.socket = socket;
 		this.maze = maze;
 	}
 
@@ -18,87 +23,105 @@ public class ClientUpdateHandlerThread extends Thread {
 	// the thread exit.
 	public void run() {
 		try {
-			ObjectInputStream fromServer = new ObjectInputStream(socket.getInputStream());
+			while(true) {
 
-			PlayerPacket pPacket = new PlayerPacket();
+				PlayerPacket pPacket = (PlayerPacket) requestLog.peek();
 
-			while ( (pPacket = (PlayerPacket) fromServer.readObject()) != null) {
+				if(pPacket != null) {
+			
+					// New player is joining the game after use, add them to our playerList using their uID
+					// as key and add them to the maze. Remote clients are purple.
+					if(pPacket.type == PlayerPacket.PLAYER_REGISTER_REPLY || pPacket.type == PlayerPacket.PLAYER_REGISTER_UPDATE) {
+						pPacket = (PlayerPacket) requestLog.take();
 
-				// New player is joining the game after use, add them to our playerList using their uID
-				// as key and add them to the maze. Remote clients are purple.
-				if(pPacket.type == PlayerPacket.PLAYER_REGISTER_REPLY || pPacket.type == PlayerPacket.PLAYER_REGISTER_UPDATE) {
+						if(!Mazewar.existingPlayers.containsKey(pPacket.uID) && !ClientUpdateHandlerThread.playerList.containsKey(pPacket.uID)) {
 
-					if(Mazewar.existingPlayers.containsKey(pPacket.uID))
-						break;
+							System.out.println("Received Join from Player: " + pPacket.playerName);
 
-					System.out.println("Received Join from Player: " + pPacket.playerName);
+							Client newClient = new RemoteClient(pPacket.playerName);
 
-					Client newClient = new RemoteClient(pPacket.playerName);
+							ClientUpdateHandlerThread.playerList.put(pPacket.uID, newClient);
 
-					ClientUpdateHandler.playerList.put(pPacket.uID, newClient);
+							maze.addClient(newClient);
 
-					maze.addClient(newClient);
+							ClientUpdateHandlerThread.actionLog.put(pPacket.lastLogIndex+1, pPacket);
+						}
+					} else if (pPacket.type == PlayerPacket.PLAYER_FORWARD) {
+						pPacket = (PlayerPacket) requestLog.take();
 
-					fromServer.close();
-					socket.close();
+						Client updateClient = ClientUpdateHandlerThread.playerList.get(pPacket.uID);
 
-					break;
-				} else if (pPacket.type == PlayerPacket.PLAYER_FORWARD) {
-					Client updateClient = ClientUpdateHandler.playerList.get(pPacket.uID);
+						// Process a request for ourselves or a remote client. Doesn't matter
+						// these methods were just removed from Client.java and placed here. Functions
+						// called by GUIClient were changed to facilitate this.
+						if(maze.moveClientForward(updateClient)) {
+       	                	updateClient.notifyMoveForward();
+        	        	}
 
-					// Process a request for ourselves or a remote client. Doesn't matter
-					// these methods were just removed from Client.java and placed here. Functions
-					// called by GUIClient were changed to facilitate this.
-					if(maze.moveClientForward(updateClient)) {
-                        updateClient.notifyMoveForward();
-                	}
+						actionLog.put(pPacket.lastLogIndex+1, pPacket);
 
-					break;
-				} else if (pPacket.type == PlayerPacket.PLAYER_BACKUP) {
+					} else if (pPacket.type == PlayerPacket.PLAYER_BACKUP) {
+						pPacket = (PlayerPacket) requestLog.take();
 
-					Client updateClient = ClientUpdateHandler.playerList.get(pPacket.uID);
+						Client updateClient = ClientUpdateHandlerThread.playerList.get(pPacket.uID);
 
-					if(maze.moveClientBackward(updateClient)) {
-                        updateClient.notifyMoveBackward();
-					}
-					break;
-                } else if (pPacket.type == PlayerPacket.PLAYER_LEFT) {
-					Client updateClient = ClientUpdateHandler.playerList.get(pPacket.uID);
+						if(maze.moveClientBackward(updateClient)) {
+        	                updateClient.notifyMoveBackward();
+						}
 
-                	updateClient.notifyTurnLeft();
+						actionLog.put(pPacket.lastLogIndex+1, pPacket);
 
-					break;
-				} else if (pPacket.type == PlayerPacket.PLAYER_RIGHT) {	
-					Client updateClient = ClientUpdateHandler.playerList.get(pPacket.uID);
+					} else if (pPacket.type == PlayerPacket.PLAYER_LEFT) {
+						pPacket = (PlayerPacket) requestLog.take();
 
-                	updateClient.notifyTurnRight();
+						Client updateClient = ClientUpdateHandlerThread.playerList.get(pPacket.uID);
 
-					break;
-				} else if (pPacket.type == PlayerPacket.PLAYER_FIRE) {
-					Client updateClient = ClientUpdateHandler.playerList.get(pPacket.uID);
+                		updateClient.notifyTurnLeft();
 
-					// Not going to handle this in a complex way, as it stands this will simply
-					// compute where the projectile will be based on our own counter. Should
-					// be sufficient but will need to fix this for Lab 3 (maybe)
-					if(maze.clientFire(updateClient)) {
-                        updateClient.notifyFire();
-					}
+						actionLog.put(pPacket.lastLogIndex+1, pPacket);
 
-					break;
-				} else if (pPacket.type == PlayerPacket.PLAYER_QUIT) {
+					} else if (pPacket.type == PlayerPacket.PLAYER_RIGHT) {	
+						pPacket = (PlayerPacket) requestLog.take();
 
-					System.out.println("Player quit..Ending game...");
+						Client updateClient = ClientUpdateHandlerThread.playerList.get(pPacket.uID);
 
-					if(pPacket.uID == "") {
-						Mazewar.quit(1);
-					} else {
-						Mazewar.quit(0);
+                		updateClient.notifyTurnRight();
+
+						actionLog.put(pPacket.lastLogIndex+1, pPacket);
+
+					} else if (pPacket.type == PlayerPacket.PLAYER_FIRE) {
+						pPacket = (PlayerPacket) requestLog.take();
+
+						Client updateClient = ClientUpdateHandlerThread.playerList.get(pPacket.uID);
+
+						// Not going to handle this in a complex way, as it stands this will simply
+						// compute where the projectile will be based on our own counter. Should
+						// be sufficient. Turns out it is.
+						if(maze.clientFire(updateClient)) {
+                   	    	updateClient.notifyFire();
+						}
+
+						actionLog.put(pPacket.lastLogIndex+1, pPacket);
+
+					} else if (pPacket.type == PlayerPacket.PLAYER_QUIT) {
+						pPacket = (PlayerPacket) requestLog.take();
+
+						// Only quit the game if we're the last one playing
+						if(MazeLeader.playerList.size() < 2) {
+							if(pPacket.uID == "") {
+								Mazewar.quit(1);
+							} else {
+								Mazewar.quit(0);
+							}
+						} else {
+							System.out.println("Player quit..");
+							maze.removeClient(ClientUpdateHandlerThread.playerList.get(pPacket.uID));
+							ClientUpdateHandlerThread.playerList.remove(pPacket.uID);
+						}
 					}
 				}
 			}
-		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (ClassNotFoundException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}

@@ -17,10 +17,20 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
 USA.
 */
   
+/*
+ * Movement code contains a try statement should a leader fail.
+ * While it initiates an election fine, and a leader is chosen,
+ * there seems to be some issues with receiving and servicing
+ * requests, which were not handled.
+ */
+
+
 import java.util.Set;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.io.*;
+import java.net.*;
+import java.util.*;
 import java.net.*;
 
 /**
@@ -132,10 +142,11 @@ public abstract class Client {
                 assert(maze != null);
                 
 				try {
-					Socket socket = new Socket(Mazewar.leaderName, Mazewar.leaderPort);
+					Socket socket = new Socket(Mazewar.leaderName, 3040);
 					PlayerPacket pForward = new PlayerPacket();
 
 					pForward.type = PlayerPacket.PLAYER_FORWARD;
+					pForward.RAFTType = PlayerPacket.RAFT_APPEND_REQUEST;
 					pForward.uID = Mazewar.uID;
 
 					ObjectOutputStream toServer = new ObjectOutputStream(socket.getOutputStream());
@@ -146,6 +157,44 @@ public abstract class Client {
 
 					return true;
 				} catch (IOException e) {
+					try {
+						for (Map.Entry<String, PlayerInfo> player : MazeLeader.playerList.entrySet()) {
+							if(Mazewar.leaderName.equals(player.getValue().hostName)) {
+								MazeLeader.playerList.remove(player.getKey());
+								maze.removeClient(ClientUpdateHandlerThread.playerList.get(player.getValue().uID));
+								ClientUpdateHandlerThread.playerList.remove(player.getKey());
+						
+								PlayerPacket leaderQuit = new PlayerPacket();
+
+								PlayerPacket beginVote = new PlayerPacket();
+								
+								MazeLeader.currentTerm.getAndAdd(1);
+	
+								MazeLeader.state.set(RAFTState.RAFT_CANDIDATE);	
+
+								beginVote.candidateID = java.net.InetAddress.getLocalHost().getHostName();
+								beginVote.RAFTType = PlayerPacket.RAFT_VOTE_BEGIN;
+								beginVote.term = MazeLeader.currentTerm.get();
+								beginVote.lastLogIndex = ClientUpdateHandlerThread.actionLog.size();
+								beginVote.lastLogTerm = ClientUpdateHandlerThread.actionLog.get(beginVote.lastLogIndex).term;
+
+								MazeLeader.requestLog.put(beginVote);
+			
+								PlayerPacket selfVote = beginVote;
+		
+								selfVote.RAFTType = PlayerPacket.RAFT_VOTE_REPLY;
+								selfVote.voteGranted = true;
+								selfVote.term = MazeLeader.currentTerm.get();
+
+								MazeLeader.requestLog.put(selfVote);
+	
+								MazeLeader.electionTimeout = System.nanoTime();	
+							}
+						}
+					} catch (Exception b) {
+						b.printStackTrace();
+					}
+					
 					System.err.println("ERROR: Cannot connect to leader!");
 					return false;
 				}
@@ -159,10 +208,11 @@ public abstract class Client {
                 assert(maze != null);
 
 				try {
-					Socket socket = new Socket(Mazewar.leaderName, Mazewar.leaderPort);
+					Socket socket = new Socket(Mazewar.leaderName, 3040);
 					PlayerPacket pBackup = new PlayerPacket();
 
 					pBackup.type = PlayerPacket.PLAYER_BACKUP;
+					pBackup.RAFTType = PlayerPacket.RAFT_APPEND_REQUEST;
 					pBackup.uID = Mazewar.uID;
 
 					ObjectOutputStream toServer = new ObjectOutputStream(socket.getOutputStream());
@@ -173,6 +223,43 @@ public abstract class Client {
 
 					return true;
 				} catch (IOException e) {
+					try {
+						for (Map.Entry<String, PlayerInfo> player : MazeLeader.playerList.entrySet()) {
+							System.out.println(Mazewar.leaderName);
+							if(Mazewar.leaderName.equals(player.getValue().hostName)) {
+								MazeLeader.playerList.remove(player.getKey());
+								maze.removeClient(ClientUpdateHandlerThread.playerList.get(player.getValue().uID));
+								ClientUpdateHandlerThread.playerList.remove(player.getKey());
+						
+								PlayerPacket beginVote = new PlayerPacket();
+								
+								MazeLeader.currentTerm.getAndAdd(1);
+	
+								MazeLeader.state.set(RAFTState.RAFT_CANDIDATE);	
+
+								beginVote.candidateID = java.net.InetAddress.getLocalHost().getHostName();
+								beginVote.RAFTType = PlayerPacket.RAFT_VOTE_BEGIN;
+								beginVote.term = MazeLeader.currentTerm.get();
+								beginVote.lastLogIndex = ClientUpdateHandlerThread.actionLog.size();
+								beginVote.lastLogTerm = ClientUpdateHandlerThread.actionLog.get(beginVote.lastLogIndex).term;
+
+								MazeLeader.requestLog.put(beginVote);
+			
+								PlayerPacket selfVote = beginVote;
+		
+								selfVote.RAFTType = PlayerPacket.RAFT_VOTE_REPLY;
+								selfVote.voteGranted = true;
+								selfVote.term = MazeLeader.currentTerm.get();
+
+								MazeLeader.requestLog.put(selfVote);
+	
+								MazeLeader.electionTimeout = System.nanoTime();	
+							}
+						}
+					} catch (Exception b) {
+						b.printStackTrace();
+					}
+
 					System.err.println("ERROR: Cannot connect to leader!");
 					return false;
 				}
@@ -183,10 +270,11 @@ public abstract class Client {
          */
         protected void turnLeft() {
 				try {
-					Socket socket = new Socket(Mazewar.leaderName, Mazewar.leaderPort);
+					Socket socket = new Socket(Mazewar.leaderName, 3040);
 					PlayerPacket pLeft = new PlayerPacket();
 
 					pLeft.type = PlayerPacket.PLAYER_LEFT;
+					pLeft.RAFTType = PlayerPacket.RAFT_APPEND_REQUEST;
 					pLeft.uID = Mazewar.uID;
 
 					ObjectOutputStream toServer = new ObjectOutputStream(socket.getOutputStream());
@@ -195,19 +283,56 @@ public abstract class Client {
 					toServer.close();
 					socket.close();
 				} catch (IOException e) {
+					try {
+						for (Map.Entry<String, PlayerInfo> player : MazeLeader.playerList.entrySet() ) {
+							if(Mazewar.leaderName.equals(player.getValue().hostName)) {
+								MazeLeader.playerList.remove(player.getKey());
+								maze.removeClient(ClientUpdateHandlerThread.playerList.get(player.getValue().uID));
+								ClientUpdateHandlerThread.playerList.remove(player.getKey());
+	
+								PlayerPacket beginVote = new PlayerPacket();
+							
+								MazeLeader.currentTerm.getAndAdd(1);
+
+								MazeLeader.state.set(RAFTState.RAFT_CANDIDATE);
+
+								beginVote.candidateID = java.net.InetAddress.getLocalHost().getHostName();
+								beginVote.RAFTType = PlayerPacket.RAFT_VOTE_BEGIN;
+								beginVote.term = MazeLeader.currentTerm.get();
+								beginVote.lastLogIndex = ClientUpdateHandlerThread.actionLog.size();
+								beginVote.lastLogTerm = ClientUpdateHandlerThread.actionLog.get(beginVote.lastLogIndex).term;
+
+								MazeLeader.requestLog.put(beginVote);
+		
+								PlayerPacket selfVote = beginVote;
+		
+								selfVote.RAFTType = PlayerPacket.RAFT_VOTE_REPLY;
+								selfVote.voteGranted = true;
+								selfVote.term = MazeLeader.currentTerm.get();
+
+								MazeLeader.requestLog.put(selfVote);
+
+								MazeLeader.electionTimeout = System.nanoTime();
+							}
+						}
+					} catch (Exception b) {
+						b.printStackTrace();
+					}
+					
 					System.err.println("ERROR: Cannot connect to leader!");
 				}
-        }
+		}
         
         /**
          * Ask the leader if we can turn 90-degrees counter-clockwise
          */
         protected void turnRight() {
                 try {
-					Socket socket = new Socket(Mazewar.leaderName, Mazewar.leaderPort);
+					Socket socket = new Socket(Mazewar.leaderName, 3040);
 					PlayerPacket pRight = new PlayerPacket();
 
 					pRight.type = PlayerPacket.PLAYER_RIGHT;
+					pRight.RAFTType = PlayerPacket.RAFT_APPEND_REQUEST;
 					pRight.uID = Mazewar.uID;
 
 					ObjectOutputStream toServer = new ObjectOutputStream(socket.getOutputStream());
@@ -216,6 +341,42 @@ public abstract class Client {
 					toServer.close();
 					socket.close();
 				} catch (IOException e) {
+					try {
+						for (Map.Entry<String, PlayerInfo> player : MazeLeader.playerList.entrySet() ) {
+							if(Mazewar.leaderName.equals(player.getValue().hostName)) {
+								MazeLeader.playerList.remove(player.getKey());
+								maze.removeClient(ClientUpdateHandlerThread.playerList.get(player.getValue().uID));
+								ClientUpdateHandlerThread.playerList.remove(player.getKey());
+	
+								PlayerPacket beginVote = new PlayerPacket();
+							
+								MazeLeader.currentTerm.getAndAdd(1);
+
+								MazeLeader.state.set(RAFTState.RAFT_CANDIDATE);
+
+								beginVote.candidateID = java.net.InetAddress.getLocalHost().getHostName();
+								beginVote.RAFTType = PlayerPacket.RAFT_VOTE_BEGIN;
+								beginVote.term = MazeLeader.currentTerm.get();
+								beginVote.lastLogIndex = ClientUpdateHandlerThread.actionLog.size();
+								beginVote.lastLogTerm = ClientUpdateHandlerThread.actionLog.get(beginVote.lastLogIndex).term;
+
+								MazeLeader.requestLog.put(beginVote);
+		
+								PlayerPacket selfVote = beginVote;
+		
+								selfVote.RAFTType = PlayerPacket.RAFT_VOTE_REPLY;
+								selfVote.voteGranted = true;
+								selfVote.term = MazeLeader.currentTerm.get();
+
+								MazeLeader.requestLog.put(selfVote);
+
+								MazeLeader.electionTimeout = System.nanoTime();
+							}
+						}
+					} catch (Exception b) {
+						b.printStackTrace();
+					}
+
 					System.err.println("ERROR: Cannot connect to leader!");
 				}
         }
@@ -228,10 +389,11 @@ public abstract class Client {
                 assert(maze != null);
 
                 try {
-					Socket socket = new Socket(Mazewar.leaderName, Mazewar.leaderPort);
+					Socket socket = new Socket(Mazewar.leaderName, 3040);
 					PlayerPacket pFire = new PlayerPacket();
 
 					pFire.type = PlayerPacket.PLAYER_FIRE;
+					pFire.RAFTType = PlayerPacket.RAFT_APPEND_REQUEST;
 					pFire.uID = Mazewar.uID;
 
 					ObjectOutputStream toServer = new ObjectOutputStream(socket.getOutputStream());
@@ -242,12 +404,46 @@ public abstract class Client {
 
 					return true;
 				} catch (IOException e) {
+					try {
+						for (Map.Entry<String, PlayerInfo> player : MazeLeader.playerList.entrySet() ) {
+							if(Mazewar.leaderName.equals(player.getValue().hostName)) {
+								MazeLeader.playerList.remove(player.getKey());
+								maze.removeClient(ClientUpdateHandlerThread.playerList.get(player.getValue().uID));
+								ClientUpdateHandlerThread.playerList.remove(player.getKey());
+	
+								PlayerPacket beginVote = new PlayerPacket();
+							
+								MazeLeader.currentTerm.getAndAdd(1);
+
+								MazeLeader.state.set(RAFTState.RAFT_CANDIDATE);
+
+								beginVote.candidateID = java.net.InetAddress.getLocalHost().getHostName();
+								beginVote.RAFTType = PlayerPacket.RAFT_VOTE_BEGIN;
+								beginVote.term = MazeLeader.currentTerm.get();
+								beginVote.lastLogIndex = ClientUpdateHandlerThread.actionLog.size();
+								beginVote.lastLogTerm = ClientUpdateHandlerThread.actionLog.get(beginVote.lastLogIndex).term;
+
+								MazeLeader.requestLog.put(beginVote);
+		
+								PlayerPacket selfVote = beginVote;
+		
+								selfVote.RAFTType = PlayerPacket.RAFT_VOTE_REPLY;
+								selfVote.voteGranted = true;
+								selfVote.term = MazeLeader.currentTerm.get();
+
+								MazeLeader.requestLog.put(selfVote);
+
+								MazeLeader.electionTimeout = System.nanoTime();
+							}
+						}
+					} catch (Exception b) {
+						b.printStackTrace();
+					}
+					
 					System.err.println("ERROR: Cannot connect to leader!");
 					
 					return false;
 				}
-				
-				
         }
         
         
